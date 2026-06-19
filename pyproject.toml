@@ -1,0 +1,20 @@
+[project]
+name = "atari-dqn"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.10"
+dependencies = [
+    "ale-py>=0.12.0",
+    "gymnasium[atari]>=0.27.0",
+    "numpy>=2.2.6",
+    "opencv-python",
+    "torch",
+    "torchvision",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "ipykernel>=7.3.0",
+    "jupyter",
+    "pytest>=9.1.0",
+]
