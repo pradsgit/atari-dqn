@@ -13,18 +13,19 @@ class AtariEnv:
     - Clip rewards to {-1, 0, 1}
     """
 
-    def __init__(self, game: str, frame_stack: int = 4, clip_rewards: bool = True):
+    def __init__(self, game: str, frame_stack: int = 4, clip_rewards: bool = True, frameskip: int = 4):
         """
         Args:
             game: Atari game name (e.g. 'Breakout', 'Pong')
             frame_stack: number of consecutive frames to stack as one state
             clip_rewards: whether to clip rewards to {-1, 0, 1} via np.sign
+            frameskip: number of frames to repeat each action (paper uses 4)
         """
         import ale_py
 
         gym.register_envs(ale_py)
 
-        self.env = gym.make(f"ALE/{game}-v5", frameskip=1)
+        self.env = gym.make(f"ALE/{game}-v5", frameskip=frameskip)
         self.frame_stack = frame_stack
         self.clip_rewards = clip_rewards
         self.frames = deque(maxlen=frame_stack)
