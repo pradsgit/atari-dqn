@@ -44,11 +44,13 @@ def train():
 
     total_steps   = 0
     episode       = 0
+    ep_loss       = []
 
     while total_steps < MAX_STEPS:
-        state   = env.reset()
+        state     = env.reset()
         ep_reward = 0
-        done    = False
+        ep_loss   = []
+        done      = False
 
         while not done:
             epsilon = get_epsilon(total_steps)
@@ -60,22 +62,25 @@ def train():
             # store transition
             buffer.push(state, action, reward, next_state, float(done))
 
-            state      = next_state
-            ep_reward += reward
+            state       = next_state
+            ep_reward  += reward
             total_steps += 1
 
             # train once buffer is large enough
             if len(buffer) >= MIN_REPLAY_SIZE:
                 s, a, r, s_next, d = buffer.sample()
                 loss = agent.train_step(s, a, r, s_next, d)
+                ep_loss.append(loss)
 
             # sync target network
             if total_steps % TARGET_SYNC_FREQ == 0:
                 agent.sync_target()
 
-        episode += 1
-        ram_used = psutil.virtual_memory().used / 1e9
-        print(f"episode {episode:4d} | steps {total_steps:8d} | reward {ep_reward:.1f} | epsilon {get_epsilon(total_steps):.3f} | ram {ram_used:.1f}GB")
+        episode  += 1
+        ram_used  = psutil.virtual_memory().used / 1e9
+        mean_loss = np.mean(ep_loss) if ep_loss else None
+        loss_str  = f"{mean_loss:.4f}" if mean_loss is not None else "collecting"
+        print(f"episode {episode:4d} | steps {total_steps:8d} | reward {ep_reward:.1f} | epsilon {get_epsilon(total_steps):.3f} | loss {loss_str} | ram {ram_used:.1f}GB")
 
     env.close()
 
