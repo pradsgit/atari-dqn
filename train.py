@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import psutil
 from env import AtariEnv
 from replay_buffer import ReplayBuffer
 from agent import DQNAgent
@@ -73,7 +74,8 @@ def train():
                 agent.sync_target()
 
         episode += 1
-        print(f"episode {episode:4d} | steps {total_steps:8d} | reward {ep_reward:.1f} | epsilon {get_epsilon(total_steps):.3f}")
+        ram_used = psutil.virtual_memory().used / 1e9
+        print(f"episode {episode:4d} | steps {total_steps:8d} | reward {ep_reward:.1f} | epsilon {get_epsilon(total_steps):.3f} | ram {ram_used:.1f}GB")
 
     env.close()
 
