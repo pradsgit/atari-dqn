@@ -2,13 +2,16 @@ from collections import deque
 import numpy as np
 import random
 
+
 class ReplayBuffer:
     """
     saves state transitions in the form (s, a, r, s`, done)
+    States are stored as uint8 (0-255) to save memory and converted
+    to float32 (0-1) on sampling.
     """
     def __init__(
-        self, 
-        max_size: int=1_000_000, 
+        self,
+        max_size: int=1_000_000,
         batch_size: int=32
     ):
         self.max_size = max_size
@@ -18,30 +21,39 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
-    def push(self, s: np.array, a: int, r: float, s_next: np.array, done: bool):
+    def push(self, s: np.ndarray, a: int, r: float, s_next: np.ndarray, done: bool):
         """
         stores one transition into the buffer
 
         Args:
-            s: current observation of the game
+            s: current observation of the game, float32 in [0, 1]
             a: action taken in this state
             r: reward obtained
-            s_next: next observation of the game
+            s_next: next observation of the game, float32 in [0, 1]
             done: is the game done?
         """
-
-        self.buffer.append((s, a, r, s_next, done))
+        # store as uint8 to reduce memory by 4x
+        self.buffer.append((
+            (s * 255).astype(np.uint8),
+            a,
+            r,
+            (s_next * 255).astype(np.uint8),
+            done
+        ))
 
     def sample(self):
         """
-        randomly pick a minibatch from the buffer and return it
+        randomly pick a minibatch from the buffer and return it.
+        Converts states from uint8 back to float32 on sampling.
         """
         assert len(self.buffer) >= self.batch_size, "not enough transitions in buffer to sample"
         temp = random.sample(self.buffer, self.batch_size)
 
-        # returns list of tuples. how would you unpack this?
-        s, a, r, s_next, done = zip(*temp) # zip(*temp) transposes the list of tuples — turns [(s1,a1,...), (s2,a2,...)] into [(s1,s2,...), (a1,a2,...)].
-        return np.array(s), np.array(a), np.array(r), np.array(s_next), np.array(done)
-
-
-        
+        s, a, r, s_next, done = zip(*temp)
+        return (
+            np.array(s,      dtype=np.float32) / 255.0,
+            np.array(a),
+            np.array(r,      dtype=np.float32),
+            np.array(s_next, dtype=np.float32) / 255.0,
+            np.array(done,   dtype=np.float32)
+        )

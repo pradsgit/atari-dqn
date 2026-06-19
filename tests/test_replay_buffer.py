@@ -4,10 +4,11 @@ from replay_buffer import ReplayBuffer
 
 
 def make_transition(state_val=0.0):
-    s = np.zeros((4, 84, 84), dtype=np.float32) + state_val
+    # states must be float32 in [0, 1] as they come from the env
+    s = np.clip(np.zeros((4, 84, 84), dtype=np.float32) + state_val / 255.0, 0, 1)
     a = 1
     r = 1.0
-    s_next = np.zeros((4, 84, 84), dtype=np.float32) + state_val + 1
+    s_next = np.clip(np.zeros((4, 84, 84), dtype=np.float32) + (state_val + 1) / 255.0, 0, 1)
     done = False
     return s, a, r, s_next, done
 
@@ -82,6 +83,16 @@ def test_sample_done_shape(buffer):
         buffer.push(*make_transition(i))
     _, _, _, _, done = buffer.sample()
     assert done.shape == (4,)
+
+
+def test_sample_states_are_float32_normalized(buffer):
+    for i in range(20):
+        buffer.push(*make_transition(i))
+    s, _, _, s_next, _ = buffer.sample()
+    assert s.dtype == np.float32
+    assert s_next.dtype == np.float32
+    assert s.min() >= 0.0
+    assert s.max() <= 1.0
 
 
 def test_sample_is_random():
