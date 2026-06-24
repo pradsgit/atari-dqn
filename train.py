@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 import psutil
@@ -20,12 +21,28 @@ EPSILON_END      = 0.1            # final exploration rate
 EPSILON_DECAY    = 1_000_000      # steps to decay epsilon over
 MIN_REPLAY_SIZE  = 50_000         # steps before training starts
 TARGET_SYNC_FREQ = 10_000         # steps between target network syncs
+CHECKPOINT_FREQ  = 100_000        # steps between checkpoints
+CHECKPOINT_DIR   = "/content/drive/MyDrive/atari-dqn/checkpoints"
 
 
 def get_epsilon(step: int) -> float:
     """linearly decay epsilon from EPSILON_START to EPSILON_END over EPSILON_DECAY steps"""
     res = EPSILON_START + (EPSILON_END - EPSILON_START) * (step / EPSILON_DECAY)
     return max(EPSILON_END, res)
+
+
+def save_checkpoint(agent: DQNAgent, total_steps: int, episode: int):
+    """saves online network weights and training state to disk"""
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+    path = os.path.join(CHECKPOINT_DIR, f"dqn_step_{total_steps}.pt")
+    torch.save({
+        "step":             total_steps,
+        "episode":          episode,
+        "online_state_dict": agent.online_net.state_dict(),
+        "target_state_dict": agent.target_net.state_dict(),
+        "optimizer_state_dict": agent.optimizer.state_dict(),
+    }, path)
+    print(f"checkpoint saved → {path}")
 
 
 def train():
@@ -42,9 +59,10 @@ def train():
         device=device
     )
 
-    total_steps   = 0
-    episode       = 0
-    ep_loss       = []
+    total_steps      = 0
+    episode          = 0
+    last_checkpoint  = 0
+    ep_loss          = []
 
     while total_steps < MAX_STEPS:
         state     = env.reset()
@@ -76,12 +94,19 @@ def train():
             if total_steps % TARGET_SYNC_FREQ == 0:
                 agent.sync_target()
 
+            # save checkpoint
+            if total_steps - last_checkpoint >= CHECKPOINT_FREQ:
+                save_checkpoint(agent, total_steps, episode)
+                last_checkpoint = total_steps
+
         episode  += 1
         ram_used  = psutil.virtual_memory().used / 1e9
         mean_loss = np.mean(ep_loss) if ep_loss else None
         loss_str  = f"{mean_loss:.4f}" if mean_loss is not None else "collecting"
         print(f"episode {episode:4d} | steps {total_steps:8d} | reward {ep_reward:.1f} | epsilon {get_epsilon(total_steps):.3f} | loss {loss_str} | ram {ram_used:.1f}GB")
 
+    # save final checkpoint
+    save_checkpoint(agent, total_steps, episode)
     env.close()
 
 
