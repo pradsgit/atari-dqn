@@ -19,7 +19,7 @@ class DQNAgent:
         for param in self.target_net.parameters():
             param.requires_grad = False
 
-        self.optimizer = torch.optim.AdamW(self.online_net.parameters(), lr=lr, weight_decay=1e-4)
+        self.optimizer = torch.optim.Adam(self.online_net.parameters(), lr=lr)
     
     def select_action(self, state: np.ndarray, epsilon: float) -> int: 
 
