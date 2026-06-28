@@ -101,9 +101,10 @@ def train():
 
         episode  += 1
         ram_used  = psutil.virtual_memory().used / 1e9
+        gpu_mem = torch.cuda.memory_allocated() / 1e9 if torch.cuda.is_available() else 0
         mean_loss = np.mean(ep_loss) if ep_loss else None
         loss_str  = f"{mean_loss:.4f}" if mean_loss is not None else "collecting"
-        print(f"episode {episode:4d} | steps {total_steps:8d} | reward {ep_reward:.1f} | epsilon {get_epsilon(total_steps):.3f} | loss {loss_str} | ram {ram_used:.1f}GB")
+        print(f"episode {episode:4d} | steps {total_steps:8d} | reward {ep_reward:.1f} | epsilon {get_epsilon(total_steps):.3f} | loss {loss_str} | cpu {ram_used:.1f}GB | gpu {gpu_mem:.1f}GB")
 
     # save final checkpoint
     save_checkpoint(agent, total_steps, episode)

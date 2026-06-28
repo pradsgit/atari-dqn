@@ -36,7 +36,7 @@ class DQNAgent:
     def train_step(self, s: np.ndarray, a: np.ndarray, r: np.ndarray, s_next: np.ndarray, done: np.ndarray) -> float:
         """
         1. Take a minibatch from the replay buffer (s, a, r, s', done)
-        2. Compute target: r + γ · max_a' target_net(s')
+        2. Compute target from frozen target network: r + γ · max_a' target_net(s')
         3. Compute prediction: online_net(s, a)
         4. Compute loss: (prediction - target)²
         5. Backprop and update online network weights

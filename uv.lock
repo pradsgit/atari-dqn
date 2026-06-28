@@ -154,6 +154,7 @@ dependencies = [
     { name = "gymnasium", extra = ["atari"] },
     { name = "numpy" },
     { name = "opencv-python" },
+    { name = "psutil" },
     { name = "torch" },
     { name = "torchvision" },
 ]
@@ -171,6 +172,7 @@ requires-dist = [
     { name = "gymnasium", extras = ["atari"], specifier = ">=0.27.0" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "opencv-python" },
+    { name = "psutil", specifier = ">=7.2.2" },
     { name = "torch" },
     { name = "torchvision" },
 ]
