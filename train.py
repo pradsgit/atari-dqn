@@ -2,6 +2,7 @@ import os
 import torch
 import numpy as np
 import psutil
+import wandb
 from env import AtariEnv
 from replay_buffer import ReplayBuffer
 from agent import DQNAgent
@@ -48,6 +49,23 @@ def save_checkpoint(agent: DQNAgent, total_steps: int, episode: int):
 def train():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"using device: {device}")
+
+    wandb.init(
+        project="atari-dqn",
+        config={
+            "game":             GAME,
+            "max_steps":        MAX_STEPS,
+            "replay_size":      REPLAY_SIZE,
+            "batch_size":       BATCH_SIZE,
+            "learning_rate":    LEARNING_RATE,
+            "gamma":            GAMMA,
+            "epsilon_start":    EPSILON_START,
+            "epsilon_end":      EPSILON_END,
+            "epsilon_decay":    EPSILON_DECAY,
+            "min_replay_size":  MIN_REPLAY_SIZE,
+            "target_sync_freq": TARGET_SYNC_FREQ,
+        }
+    )
 
     env    = AtariEnv(GAME, frame_stack=FRAME_STACK)
     buffer = ReplayBuffer(max_size=REPLAY_SIZE, batch_size=BATCH_SIZE)
@@ -101,14 +119,28 @@ def train():
 
         episode  += 1
         ram_used  = psutil.virtual_memory().used / 1e9
-        gpu_mem = torch.cuda.memory_allocated() / 1e9 if torch.cuda.is_available() else 0
+        gpu_mem   = torch.cuda.memory_allocated() / 1e9 if torch.cuda.is_available() else 0
+        epsilon   = get_epsilon(total_steps)
         mean_loss = np.mean(ep_loss) if ep_loss else None
         loss_str  = f"{mean_loss:.4f}" if mean_loss is not None else "collecting"
-        print(f"episode {episode:4d} | steps {total_steps:8d} | reward {ep_reward:.1f} | epsilon {get_epsilon(total_steps):.3f} | loss {loss_str} | cpu {ram_used:.1f}GB | gpu {gpu_mem:.1f}GB")
+        print(f"episode {episode:4d} | steps {total_steps:8d} | reward {ep_reward:.1f} | epsilon {epsilon:.3f} | loss {loss_str} | cpu {ram_used:.1f}GB | gpu {gpu_mem:.1f}GB")
+
+        log = {
+            "episode":          episode,
+            "reward":           ep_reward,
+            "epsilon":          epsilon,
+            "cpu_ram_gb":       ram_used,
+            "gpu_ram_gb":       gpu_mem,
+            "total_steps":      total_steps,
+        }
+        if mean_loss is not None:
+            log["loss"] = mean_loss
+        wandb.log(log, step=total_steps)
 
     # save final checkpoint
     save_checkpoint(agent, total_steps, episode)
     env.close()
+    wandb.finish()
 
 
 if __name__ == "__main__":
