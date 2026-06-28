@@ -67,12 +67,21 @@ class AtariEnv:
 
         Fills the frame stack with copies of the first processed frame so the
         agent always receives a full (frame_stack, 84, 84) state from the start.
+        Presses FIRE automatically if the game requires it to launch the ball
+        (e.g. Breakout), so the agent never gets stuck in a permanent NOOP loop.
 
         Returns:
             initial state of shape (frame_stack, 84, 84), dtype float32
         """
         frame, _ = self.env.reset()
         self.prev_frame = None
+
+        # press FIRE to start games that require it (e.g. Breakout)
+        action_meanings = self.env.unwrapped.get_action_meanings()
+        if 'FIRE' in action_meanings:
+            fire_action = action_meanings.index('FIRE')
+            frame, _, _, _, _ = self.env.step(fire_action)
+
         processed = self._preprocess(frame)
         for _ in range(self.frame_stack):
             self.frames.append(processed)
