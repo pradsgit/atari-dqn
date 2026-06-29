@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from env import AtariEnv
 from agent import DQNAgent
-from gymnasium.wrappers import RecordVideo
 
 
 GAME        = "Breakout"
@@ -75,42 +74,42 @@ def evaluate(agent: DQNAgent, n_episodes: int = 10) -> tuple[float, float]:
 def record_video(agent: DQNAgent, n_episodes: int = 1):
     """
     records gameplay video of the agent playing with epsilon=0.
-    Uses gymnasium RecordVideo wrapper around the raw ALE env for rendering,
-    while using AtariEnv for preprocessing and action selection.
+    Uses a single AtariEnv with render_mode="rgb_array" so auto-fire steps
+    and all internal env steps are captured accurately.
 
     Args:
         agent: trained DQNAgent
         n_episodes: number of episodes to record
     """
-    import ale_py
-    import gymnasium as gym
-    gym.register_envs(ale_py)
+    import cv2
 
     os.makedirs(VIDEO_DIR, exist_ok=True)
 
-    # raw env for video recording
-    raw_env = gym.make(f"ALE/{GAME}-v5", frameskip=4, render_mode="rgb_array")
-    raw_env = RecordVideo(raw_env, video_folder=VIDEO_DIR, episode_trigger=lambda e: True)
-
-    # preprocessed env for agent
-    atari_env = AtariEnv(GAME, frame_stack=FRAME_STACK, clip_rewards=False)
+    env = AtariEnv(GAME, frame_stack=FRAME_STACK, clip_rewards=False, render_mode="rgb_array")
 
     for ep in range(n_episodes):
-        raw_env.reset()
-        state = atari_env.reset()
+        state = env.reset()
         done  = False
         total_reward = 0
+        frames = []
 
         while not done:
             action = agent.select_action(state, epsilon=0.0)
-            state, reward, done, _ = atari_env.step(action)
-            raw_env.step(action)   # advances raw env for video recording
+            state, reward, done, _ = env.step(action)
+            frames.append(env.render())   # captures state after all internal steps
             total_reward += reward
 
-        print(f"recorded episode {ep+1} | reward {total_reward:.1f}")
+        # write frames to mp4
+        video_path = os.path.join(VIDEO_DIR, f"episode_{ep + 1}.mp4")
+        h, w = frames[0].shape[:2]
+        writer = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'mp4v'), 30, (w, h))
+        for frame in frames:
+            writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+        writer.release()
 
-    raw_env.close()
-    atari_env.close()
+        print(f"recorded episode {ep + 1} | reward {total_reward:.1f} | frames {len(frames)}")
+
+    env.close()
     print(f"videos saved to {VIDEO_DIR}")
 
 

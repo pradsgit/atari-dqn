@@ -13,7 +13,7 @@ class AtariEnv:
     - Clip rewards to {-1, 0, 1}
     """
 
-    def __init__(self, game: str, frame_stack: int = 4, clip_rewards: bool = True, frameskip: int = 4):
+    def __init__(self, game: str, frame_stack: int = 4, clip_rewards: bool = True, frameskip: int = 4, render_mode: str = None):
         """
         Args:
             game: Atari game name (e.g. 'Breakout', 'Pong')
@@ -25,7 +25,7 @@ class AtariEnv:
 
         gym.register_envs(ale_py)
 
-        self.env = gym.make(f"ALE/{game}-v5", frameskip=frameskip)
+        self.env = gym.make(f"ALE/{game}-v5", frameskip=frameskip, render_mode=render_mode)
         self.frame_stack = frame_stack
         self.clip_rewards = clip_rewards
         self.frames = deque(maxlen=frame_stack)
@@ -128,6 +128,10 @@ class AtariEnv:
             array of shape (frame_stack, 84, 84), dtype float32
         """
         return np.array(self.frames, dtype=np.float32)
+
+    def render(self) -> np.ndarray:
+        """Returns the current raw RGB frame from the emulator."""
+        return self.env.render()
 
     def close(self):
         """Closes the underlying environment and releases resources."""
