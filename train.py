@@ -135,6 +135,15 @@ def train():
         }
         if mean_loss is not None:
             log["loss"] = mean_loss
+
+        # mean max Q-value over a sample batch — tracks whether Q-values are growing or collapsing
+        if len(buffer) >= MIN_REPLAY_SIZE:
+            s, _, _, _, _ = buffer.sample()
+            s_tensor = torch.tensor(s, dtype=torch.float32).to(agent.device)
+            with torch.no_grad():
+                q_values = agent.online_net(s_tensor)
+            log["mean_max_q"] = q_values.max(dim=1).values.mean().item()
+
         wandb.log(log, step=total_steps)
 
     # save final checkpoint
