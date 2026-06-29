@@ -105,9 +105,12 @@ class AtariEnv:
         """
         frame, reward, terminated, truncated, info = self.env.step(action)
 
-        # auto-fire after life loss so the ball relaunches immediately
+        # auto-fire after life loss so the ball relaunches
+        # wait a few NOOPs first — Breakout needs a transition before FIRE registers
         current_lives = info.get('lives', self._lives)
         if self._fire_action is not None and current_lives < self._lives and not terminated:
+            for _ in range(5):
+                self.env.step(0)  # NOOP
             frame, _, _, _, _ = self.env.step(self._fire_action)
         self._lives = current_lives
 
