@@ -6,7 +6,7 @@ from env import AtariEnv
 from agent import DQNAgent
 
 
-GAME        = "Breakout"
+GAME        = "Pong"
 FRAME_STACK = 4
 CHECKPOINT_DIR = "/content/drive/MyDrive/atari-dqn/checkpoints"
 VIDEO_DIR      = "/content/drive/MyDrive/atari-dqn/videos"
