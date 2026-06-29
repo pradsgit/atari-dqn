@@ -33,6 +33,9 @@ class AtariEnv:
 
         self.observation_space = (frame_stack, 84, 84)
         self.action_space = self.env.action_space.n
+        self._lives = 0
+        action_meanings = self.env.unwrapped.get_action_meanings()
+        self._fire_action = action_meanings.index('FIRE') if 'FIRE' in action_meanings else None
 
     def _preprocess(self, frame: np.ndarray) -> np.ndarray:
         """
@@ -77,10 +80,10 @@ class AtariEnv:
         self.prev_frame = None
 
         # press FIRE to start games that require it (e.g. Breakout)
-        action_meanings = self.env.unwrapped.get_action_meanings()
-        if 'FIRE' in action_meanings:
-            fire_action = action_meanings.index('FIRE')
-            frame, _, _, _, _ = self.env.step(fire_action)
+        if self._fire_action is not None:
+            frame, _, _, _, _ = self.env.step(self._fire_action)
+
+        self._lives = self.env.unwrapped.ale.lives()
 
         processed = self._preprocess(frame)
         for _ in range(self.frame_stack):
@@ -101,6 +104,13 @@ class AtariEnv:
             info:   dict of auxiliary info from the emulator
         """
         frame, reward, terminated, truncated, info = self.env.step(action)
+
+        # auto-fire after life loss so the ball relaunches immediately
+        current_lives = info.get('lives', self._lives)
+        if self._fire_action is not None and current_lives < self._lives and not terminated:
+            frame, _, _, _, _ = self.env.step(self._fire_action)
+        self._lives = current_lives
+
         processed = self._preprocess(frame)
         self.frames.append(processed)
 
