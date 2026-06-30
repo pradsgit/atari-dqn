@@ -75,20 +75,17 @@ class AtariEnv:
         total_reward = 0.0
         terminated = truncated = False
         info = {}
-        frame_buffer = []
+        all_frames = []
 
-        for i in range(self.frameskip):
+        for _ in range(self.frameskip):
             frame, reward, terminated, truncated, info = self.env.step(action)
             total_reward += reward
-            # keep the last 2 raw frames for max-pooling
-            if i >= self.frameskip - 2:
-                frame_buffer.append(frame)
+            all_frames.append(frame)
             if terminated or truncated:
                 break
 
-        if not frame_buffer:
-            frame_buffer.append(frame)  # terminated before last-2 window; frame is last step's output
-        max_frame = np.maximum(frame_buffer[0], frame_buffer[-1]) if len(frame_buffer) == 2 else frame_buffer[0]
+        # max-pool last 2 raw frames; always safe since loop runs at least once
+        max_frame = np.maximum(all_frames[-2], all_frames[-1]) if len(all_frames) >= 2 else all_frames[-1]
 
         # use ale.lives() as the authoritative source — info['lives'] can lag
         current_lives = self.env.unwrapped.ale.lives()
