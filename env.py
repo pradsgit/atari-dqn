@@ -86,6 +86,8 @@ class AtariEnv:
             if terminated or truncated:
                 break
 
+        if not frame_buffer:
+            frame_buffer.append(frame)  # terminated before last-2 window; frame is last step's output
         max_frame = np.maximum(frame_buffer[0], frame_buffer[-1]) if len(frame_buffer) == 2 else frame_buffer[0]
 
         # use ale.lives() as the authoritative source — info['lives'] can lag
