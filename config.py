@@ -5,8 +5,8 @@ GAME        = "Breakout"
 FRAME_STACK = 4
 
 # --- training ---
-MAX_STEPS        = 50_000_000
-REPLAY_SIZE      = 500_000
+MAX_STEPS        = 10_000_000
+REPLAY_SIZE      = 300_000
 BATCH_SIZE       = 32
 LEARNING_RATE    = 0.00025
 GAMMA            = 0.99
