@@ -88,13 +88,13 @@ class AtariEnv:
 
         max_frame = np.maximum(frame_buffer[0], frame_buffer[-1]) if len(frame_buffer) == 2 else frame_buffer[0]
 
-        current_lives = info.get('lives', self._lives)
+        # use ale.lives() as the authoritative source — info['lives'] can lag
+        current_lives = self.env.unwrapped.ale.lives()
         life_lost = current_lives < self._lives and not terminated
 
         if self._fire_action is not None and life_lost:
-            for _ in range(20):
-                self.env.step(0)
-            self.env.step(self._fire_action)
+            fire_frame, _, _, _, _ = self.env.step(self._fire_action)
+            max_frame = fire_frame  # update state to post-relaunch frame
 
         self._lives = current_lives
 
