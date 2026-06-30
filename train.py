@@ -27,6 +27,41 @@ def save_checkpoint(agent: DQNAgent, total_steps: int, episode: int):
     print(f"checkpoint saved → {path}")
 
 
+def record_training_video(agent: DQNAgent, total_steps: int):
+    import cv2
+    from env import AtariEnv
+
+    os.makedirs(config.VIDEO_DIR, exist_ok=True)
+    env = AtariEnv(config.GAME, frame_stack=config.FRAME_STACK, clip_rewards=False, render_mode="rgb_array")
+
+    state = env.reset()
+    frames = []
+    total_reward = 0
+    step = 0
+
+    while step < 2000:
+        action = agent.select_action(state, epsilon=0.05)
+        state, reward, done, info = env.step(action)
+        frames.append(env.render())
+        total_reward += reward
+        step += 1
+        if info.get('real_done', done):
+            break
+
+    env.close()
+
+    if not frames:
+        return
+
+    path = os.path.join(config.VIDEO_DIR, f"step_{total_steps}.mp4")
+    h, w = frames[0].shape[:2]
+    writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*'mp4v'), 30, (w, h))
+    for frame in frames:
+        writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+    writer.release()
+    print(f"video saved → {path} | reward {total_reward:.1f} | frames {len(frames)}")
+
+
 def train():
     if torch.cuda.is_available():
         device = "cuda"
@@ -109,9 +144,10 @@ def train():
             agent.sync_target()
             last_target_sync = total_steps
 
-        # checkpoint
+        # checkpoint + video
         if total_steps - last_checkpoint >= config.CHECKPOINT_FREQ:
             save_checkpoint(agent, total_steps, episode)
+            record_training_video(agent, total_steps)
             last_checkpoint = total_steps
 
         # log completed episodes (real_done only — not life loss)
