@@ -4,12 +4,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from env import AtariEnv
 from agent import DQNAgent
+import config
 
-
-GAME        = "Pong"
-FRAME_STACK = 4
-CHECKPOINT_DIR = "/content/drive/MyDrive/atari-dqn/checkpoints"
-VIDEO_DIR      = "/content/drive/MyDrive/atari-dqn/videos"
+GAME           = config.GAME
+FRAME_STACK    = config.FRAME_STACK
+CHECKPOINT_DIR = config.CHECKPOINT_DIR
+VIDEO_DIR      = config.VIDEO_DIR
 
 
 def load_agent(checkpoint_path: str, device: str) -> DQNAgent:
