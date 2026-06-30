@@ -3,6 +3,7 @@ import os
 # --- game ---
 GAME        = "Breakout"
 FRAME_STACK = 4
+N_ENVS      = 4
 
 # --- training ---
 MAX_STEPS        = 10_000_000
