@@ -47,7 +47,12 @@ def save_checkpoint(agent: DQNAgent, total_steps: int, episode: int):
 
 
 def train():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
     print(f"using device: {device}")
 
     wandb.init(
