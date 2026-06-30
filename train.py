@@ -64,9 +64,10 @@ def train():
         device=device
     )
 
-    total_steps     = 0
-    episode         = 0
-    last_checkpoint = 0
+    total_steps      = 0
+    episode          = 0
+    last_checkpoint  = 0
+    last_target_sync = 0
 
     # per-env episode tracking
     ep_rewards = np.zeros(config.N_ENVS)
@@ -99,8 +100,9 @@ def train():
                 ep_losses[i].append(loss)
 
         # sync target network
-        if total_steps % config.TARGET_SYNC_FREQ == 0:
+        if total_steps - last_target_sync >= config.TARGET_SYNC_FREQ:
             agent.sync_target()
+            last_target_sync = total_steps
 
         # checkpoint
         if total_steps - last_checkpoint >= config.CHECKPOINT_FREQ:
