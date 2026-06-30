@@ -14,7 +14,7 @@ def _worker(remote, parent_remote, game, frame_stack, clip_rewards, frameskip):
             remote.send(env.reset())
         elif cmd == 'step':
             state, reward, done, info = env.step(data)
-            if done:
+            if info.get('real_done', done):
                 state = env.reset()
             remote.send((state, reward, done, info))
         elif cmd == 'close':

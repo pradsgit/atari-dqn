@@ -7,29 +7,28 @@ from collections import deque
 class AtariEnv:
     """
     Wraps an ALE Atari env with the preprocessing from the DQN 2015 paper:
-    - Pixel-wise max over last 2 frames to remove sprite flickering
+    - Manual frameskip: step the env frameskip times, max-pool the last 2 raw
+      frames to remove sprite flickering (sprites alternate on consecutive frames)
     - Extract Y channel (luminance) and resize to 84x84
     - Stack 4 consecutive processed frames as the state
     - Clip rewards to {-1, 0, 1}
+    - repeat_action_probability=0.0 (no sticky actions, matching the paper)
+    - Episodic-life termination: done=True on life loss for TD bootstrapping,
+      but the episode continues with auto-fire so the agent keeps playing
     """
 
     def __init__(self, game: str, frame_stack: int = 4, clip_rewards: bool = True, frameskip: int = 4, render_mode: str = None):
-        """
-        Args:
-            game: Atari game name (e.g. 'Breakout', 'Pong')
-            frame_stack: number of consecutive frames to stack as one state
-            clip_rewards: whether to clip rewards to {-1, 0, 1} via np.sign
-            frameskip: number of frames to repeat each action (paper uses 4)
-        """
         import ale_py
-
         gym.register_envs(ale_py)
 
-        self.env = gym.make(f"ALE/{game}-v5", frameskip=frameskip, render_mode=render_mode)
+        # frameskip=1 so we control the skip loop and can max-pool raw frames
+        # repeat_action_probability=0.0 matches the 2015 paper (no sticky actions)
+        self.env = gym.make(f"ALE/{game}-v5", frameskip=1,
+                            repeat_action_probability=0.0, render_mode=render_mode)
+        self.frameskip   = frameskip
         self.frame_stack = frame_stack
         self.clip_rewards = clip_rewards
         self.frames = deque(maxlen=frame_stack)
-        self.prev_frame = None  # needed for pixel-wise max
 
         self.observation_space = (frame_stack, 84, 84)
         self.action_space = self.env.action_space.n
@@ -40,51 +39,22 @@ class AtariEnv:
     def _preprocess(self, frame: np.ndarray) -> np.ndarray:
         """
         Applies DQN preprocessing to a single raw RGB frame.
+        Expects the frame to already be max-pooled over the last 2 emulator frames.
 
         Steps:
-          1. Pixel-wise max with previous frame — removes sprite flickering
-             caused by Atari 2600 hardware alternating sprites across frames.
-          2. Convert RGB to YCrCb and extract Y (luminance) channel — reduces
-             3 color channels to 1 brightness channel.
-          3. Resize to 84x84 and normalize to [0, 1].
-
-        Args:
-            frame: raw RGB frame from the emulator, shape (210, 160, 3)
-
-        Returns:
-            processed frame of shape (84, 84), dtype float32, values in [0, 1]
+          1. Convert RGB to YCrCb and extract Y (luminance) channel
+          2. Resize to 84x84 and normalize to [0, 1]
         """
-        if self.prev_frame is not None:
-            frame = np.maximum(frame, self.prev_frame)
-        self.prev_frame = frame
-
         ycrcb = cv2.cvtColor(frame, cv2.COLOR_RGB2YCrCb)
         y_channel = ycrcb[:, :, 0]
-
         resized = cv2.resize(y_channel, (84, 84), interpolation=cv2.INTER_AREA)
         return resized.astype(np.float32) / 255.0
 
     def reset(self) -> np.ndarray:
-        """
-        Resets the environment and returns the initial state.
-
-        Fills the frame stack with copies of the first processed frame so the
-        agent always receives a full (frame_stack, 84, 84) state from the start.
-        Presses FIRE automatically if the game requires it to launch the ball
-        (e.g. Breakout), so the agent never gets stuck in a permanent NOOP loop.
-
-        Returns:
-            initial state of shape (frame_stack, 84, 84), dtype float32
-        """
         frame, _ = self.env.reset()
-        self.prev_frame = None
-
-        # press FIRE to start games that require it (e.g. Breakout)
         if self._fire_action is not None:
             frame, _, _, _, _ = self.env.step(self._fire_action)
-
         self._lives = self.env.unwrapped.ale.lives()
-
         processed = self._preprocess(frame)
         for _ in range(self.frame_stack):
             self.frames.append(processed)
@@ -92,50 +62,59 @@ class AtariEnv:
 
     def step(self, action: int):
         """
-        Executes one action in the environment.
+        Executes one agent step = frameskip emulator steps.
 
-        Args:
-            action: integer index into the action space
+        Max-pools the last 2 raw frames within the skip to remove sprite
+        flickering (Atari alternates sprites on consecutive frames).
 
-        Returns:
-            state:  next state of shape (frame_stack, 84, 84), dtype float32
-            reward: clipped to {-1, 0, 1} if clip_rewards=True
-            done:   True if the episode has ended
-            info:   dict of auxiliary info from the emulator
+        Returns done=True on life loss (episodic-life termination) so the TD
+        target doesn't bootstrap through a death. info['real_done'] is True
+        only when the actual episode ends, used by vec_env to decide whether
+        to reset.
         """
-        frame, reward, terminated, truncated, info = self.env.step(action)
+        total_reward = 0.0
+        terminated = truncated = False
+        info = {}
+        frame_buffer = []
 
-        # auto-fire after life loss so the ball relaunches
-        # wait a few NOOPs first — Breakout needs a transition before FIRE registers
+        for i in range(self.frameskip):
+            frame, reward, terminated, truncated, info = self.env.step(action)
+            total_reward += reward
+            # keep the last 2 raw frames for max-pooling
+            if i >= self.frameskip - 2:
+                frame_buffer.append(frame)
+            if terminated or truncated:
+                break
+
+        max_frame = np.maximum(frame_buffer[0], frame_buffer[-1]) if len(frame_buffer) == 2 else frame_buffer[0]
+
         current_lives = info.get('lives', self._lives)
-        if self._fire_action is not None and current_lives < self._lives and not terminated:
-            for _ in range(5):
-                self.env.step(0)  # NOOP
-            frame, _, _, _, _ = self.env.step(self._fire_action)
+        life_lost = current_lives < self._lives and not terminated
+
+        if self._fire_action is not None and life_lost:
+            for _ in range(20):
+                self.env.step(0)
+            self.env.step(self._fire_action)
+
         self._lives = current_lives
 
-        processed = self._preprocess(frame)
+        processed = self._preprocess(max_frame)
         self.frames.append(processed)
 
         if self.clip_rewards:
-            reward = np.sign(reward)
+            total_reward = np.sign(total_reward)
 
-        done = terminated or truncated
-        return self._get_state(), reward, done, info
+        real_done   = terminated or truncated
+        done_for_td = real_done or life_lost
+        info['real_done'] = real_done
+
+        return self._get_state(), total_reward, done_for_td, info
 
     def _get_state(self) -> np.ndarray:
-        """
-        Returns the current stacked frame state.
-
-        Returns:
-            array of shape (frame_stack, 84, 84), dtype float32
-        """
         return np.array(self.frames, dtype=np.float32)
 
     def render(self) -> np.ndarray:
-        """Returns the current raw RGB frame from the emulator."""
         return self.env.render()
 
     def close(self):
-        """Closes the underlying environment and releases resources."""
         self.env.close()

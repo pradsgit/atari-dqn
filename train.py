@@ -82,9 +82,12 @@ def train():
         actions = np.array([agent.select_action(states[i], epsilon) for i in range(config.N_ENVS)])
 
         # step all envs in parallel
-        next_states, rewards, dones, _ = vec_env.step(actions)
+        next_states, rewards, dones, infos = vec_env.step(actions)
 
-        # store N transitions
+        # real_done is True only when the episode ends (not on life loss)
+        real_dones = np.array([info.get('real_done', dones[i]) for i, info in enumerate(infos)])
+
+        # store N transitions — dones includes life-loss termination for TD
         for i in range(config.N_ENVS):
             buffer.push(states[i], actions[i], rewards[i], next_states[i], float(dones[i]))
             ep_rewards[i] += rewards[i]
@@ -92,10 +95,12 @@ def train():
 
         states = next_states
 
-        # train once per vectorized step
+        # match paper's update frequency: 1 gradient step per 4 env steps
         if len(buffer) >= config.MIN_REPLAY_SIZE:
-            s, a, r, s_next, d = buffer.sample()
-            loss = agent.train_step(s, a, r, s_next, d)
+            n_updates = max(1, config.N_ENVS // 4)
+            for _ in range(n_updates):
+                s, a, r, s_next, d = buffer.sample()
+                loss = agent.train_step(s, a, r, s_next, d)
             for i in range(config.N_ENVS):
                 ep_losses[i].append(loss)
 
@@ -109,9 +114,9 @@ def train():
             save_checkpoint(agent, total_steps, episode)
             last_checkpoint = total_steps
 
-        # log completed episodes
+        # log completed episodes (real_done only — not life loss)
         for i in range(config.N_ENVS):
-            if dones[i]:
+            if real_dones[i]:
                 episode   += 1
                 ram_used   = psutil.virtual_memory().used / 1e9
                 gpu_mem    = torch.cuda.memory_allocated() / 1e9 if torch.cuda.is_available() else 0
