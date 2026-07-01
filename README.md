@@ -2,7 +2,7 @@
 
 PyTorch implementation of [Playing Atari with Deep Reinforcement Learning](https://arxiv.org/abs/1312.5602) (Mnih et al., 2015), trained on Breakout.
 
-<video src="https://github.com/pradsgit/atari-dqn/raw/main/videos/gameplay.mp4" controls width="400"></video>
+<video src="https://github.com/user-attachments/assets/219f633d-124e-45b0-a019-90eb09cbec9c" controls width="400"></video>
 
 Agent reaching 80+ reward after 10M steps of training.
 
