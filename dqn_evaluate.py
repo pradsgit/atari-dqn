@@ -71,15 +71,10 @@ def evaluate(agent: DQNAgent, n_episodes: int = 10) -> tuple[float, float]:
     return mean, std
 
 
-def record_video(agent: DQNAgent, n_episodes: int = 1, max_steps: int = 3000):
+def record_video(agent: DQNAgent, n_episodes: int = 1):
     """
     records gameplay video of the agent playing with epsilon=0.
-    Uses a single AtariEnv with render_mode="rgb_array" so auto-fire steps
-    and all internal env steps are captured accurately.
-
-    Args:
-        agent: trained DQNAgent
-        n_episodes: number of episodes to record
+    Runs until the game actually ends (all lives lost), not on life loss.
     """
     import cv2
 
@@ -89,17 +84,16 @@ def record_video(agent: DQNAgent, n_episodes: int = 1, max_steps: int = 3000):
 
     for ep in range(n_episodes):
         state = env.reset()
-        done  = False
         total_reward = 0
         frames = []
 
-        step = 0
-        while not done and step < max_steps:
+        while True:
             action = agent.select_action(state, epsilon=0.0)
-            state, reward, done, _ = env.step(action)
-            frames.append(env.render())   # captures state after all internal steps
+            state, reward, done, info = env.step(action)
+            frames.append(env.render())
             total_reward += reward
-            step += 1
+            if info.get('real_done', done):  # stop only when all lives are gone
+                break
 
         # write frames to mp4
         video_path = os.path.join(VIDEO_DIR, f"episode_{ep + 1}.mp4")
